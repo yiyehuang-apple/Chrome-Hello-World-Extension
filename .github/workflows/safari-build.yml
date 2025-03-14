@@ -85,7 +85,7 @@ jobs:
         ls -la
         
         # 构建项目
-        xcodebuild -project "${PROJECT_NAME}.xcodeproj" -scheme "$SCHEME" -configuration Debug \
+        xcodebuild -project "${PROJECT_NAME}.xcodeproj" -scheme "Hello Extensions (macOS)" -configuration Debug \
           CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
           SWIFT_OPTIMIZATION_LEVEL="-Onone" \
           -derivedDataPath build ONLY_ACTIVE_ARCH=NO
