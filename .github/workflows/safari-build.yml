@@ -36,15 +36,32 @@ jobs:
       run: |
         # 使用苹果的转换工具
         echo "开始转换 Chrome 扩展到 Safari 扩展..."
-        xcrun safari-web-extension-converter ${GITHUB_WORKSPACE} --project-location ${GITHUB_WORKSPACE}/safari-extension --force --no-prompt
+        xcrun safari-web-extension-converter ${GITHUB_WORKSPACE} --project-location ${GITHUB_WORKSPACE}/safari-extension --copy-resources --no-open --no-prompt
         echo "转换完成！"
     
     - name: Build Safari Extension
-      working-directory: safari-extension
       run: |
-        # 获取自动生成的项目名称
-        PROJECT_NAME=$(ls *.xcodeproj | head -n 1 | sed 's/\.xcodeproj//')
+        # 查找项目目录
+        echo "查找 Xcode 项目文件..."
+        PROJECT_DIR=$(find ${GITHUB_WORKSPACE}/safari-extension -name "*.xcodeproj" -type d | head -n 1)
+        
+        if [ -z "$PROJECT_DIR" ]; then
+          echo "❌ 找不到 .xcodeproj 文件"
+          echo "目录内容:"
+          find ${GITHUB_WORKSPACE}/safari-extension -type d
+          exit 1
+        fi
+        
+        # 提取项目名称和工作目录
+        PROJECT_NAME=$(basename "$PROJECT_DIR" .xcodeproj)
+        WORKING_DIR=$(dirname "$PROJECT_DIR")
+        
+        echo "项目目录: $PROJECT_DIR"
         echo "项目名称: $PROJECT_NAME"
+        echo "工作目录: $WORKING_DIR"
+        
+        # 切换到工作目录
+        cd "$WORKING_DIR"
         
         # 设置版本号和构建号
         VERSION="1.0.0"
@@ -54,8 +71,7 @@ jobs:
         ls -la
         
         # 构建项目
-        xcodebuild -project ${PROJECT_NAME}.xcodeproj -scheme "${PROJECT_NAME}" -configuration Release -derivedDataPath build
-        
+        xcodebuild -project "${PROJECT_NAME}.xcodeproj" -scheme "${PROJECT_NAME}" -configuration Release -derivedDataPath build
         echo "构建完成！"
     
     - name: Archive artifacts
