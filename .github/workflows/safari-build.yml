@@ -95,4 +95,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: safari-extension
-        path: safari-extension/build/Build/Products/Release/*.app
+        path: |
+          **/build/Build/Products/Debug*/*.app
+          **/build/Build/Products/Debug*/*.appex
