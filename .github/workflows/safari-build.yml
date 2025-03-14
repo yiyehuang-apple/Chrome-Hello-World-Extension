@@ -1,0 +1,130 @@
+name: Build and Deploy Safari Extension
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Xcode
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: latest-stable
+    
+    - name: Setup project structure
+      run: |
+        # 确保项目目录结构正确
+        ls -la
+        echo "检查项目文件..."
+        if [ -f "manifest.json" ]; then
+          echo "✅ manifest.json 存在"
+        else
+          echo "⚠️ manifest.json 不存在"
+          exit 1
+        fi
+    
+    - name: Convert Chrome Extension to Safari Extension
+      run: |
+        # 使用苹果的转换工具
+        echo "开始转换 Chrome 扩展到 Safari 扩展..."
+        xcrun safari-web-extension-converter ${GITHUB_WORKSPACE} --project-location ${GITHUB_WORKSPACE}/safari-extension --force --no-prompt
+        echo "转换完成！"
+    
+    - name: Build Safari Extension
+      working-directory: safari-extension
+      run: |
+        # 获取自动生成的项目名称
+        PROJECT_NAME=$(ls *.xcodeproj | head -n 1 | sed 's/\.xcodeproj//')
+        echo "项目名称: $PROJECT_NAME"
+        
+        # 设置版本号和构建号
+        VERSION="1.0.0"
+        BUILD_NUMBER=${{ github.run_number }}
+        
+        # 显示项目结构
+        ls -la
+        
+        # 构建项目
+        xcodebuild -project ${PROJECT_NAME}.xcodeproj -scheme "${PROJECT_NAME}" -configuration Release -derivedDataPath build
+        
+        echo "构建完成！"
+    
+    - name: Archive artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: safari-extension
+        path: safari-extension/build/Build/Products/Release/*.app
+    
+    # 以下步骤需要配置证书和配置文件才能执行（仅在您准备发布时取消注释）
+    
+    # - name: Install Apple Certificate
+    #   if: github.event_name != 'pull_request'
+    #   env:
+    #     BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+    #     P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+    #     KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+    #   run: |
+    #     # 创建临时keychain
+    #     KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+    #     security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+    #     security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+    #     security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+    #     
+    #     # 导入证书到keychain
+    #     echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode --output $RUNNER_TEMP/build_certificate.p12
+    #     security import $RUNNER_TEMP/build_certificate.p12 -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+    #     security list-keychain -d user -s $KEYCHAIN_PATH
+    
+    # - name: Install Provisioning Profile
+    #   if: github.event_name != 'pull_request'
+    #   env:
+    #     PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+    #   run: |
+    #     # 创建provisioning profile目录
+    #     mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+    #     
+    #     # 导入provisioning profile
+    #     echo -n "$PROVISIONING_PROFILE_BASE64" | base64 --decode --output ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+    
+    # - name: Export IPA
+    #   if: github.event_name != 'pull_request'
+    #   working-directory: safari-extension
+    #   env:
+    #     EXPORT_OPTIONS_PLIST_BASE64: ${{ secrets.EXPORT_OPTIONS_PLIST_BASE64 }}
+    #   run: |
+    #     # 获取自动生成的项目名称
+    #     PROJECT_NAME=$(ls *.xcodeproj | head -n 1 | sed 's/\.xcodeproj//')
+    #     
+    #     # 解码exportOptions.plist
+    #     echo -n "$EXPORT_OPTIONS_PLIST_BASE64" | base64 --decode --output $RUNNER_TEMP/ExportOptions.plist
+    #     
+    #     # 归档项目
+    #     xcodebuild -project ${PROJECT_NAME}.xcodeproj -scheme "${PROJECT_NAME}" -configuration Release -archivePath $RUNNER_TEMP/app.xcarchive archive
+    #     
+    #     # 导出IPA文件
+    #     xcodebuild -exportArchive -archivePath $RUNNER_TEMP/app.xcarchive -exportPath $RUNNER_TEMP/export -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist
+    
+    # - name: Upload to TestFlight
+    #   if: github.event_name != 'pull_request'
+    #   env:
+    #     APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+    #     APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+    #     APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+    #   run: |
+    #     # 解码API密钥
+    #     echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode --output $RUNNER_TEMP/api_key.p8
+    #     
+    #     # 使用altool上传到TestFlight
+    #     xcrun altool --upload-app --type ios --file $RUNNER_TEMP/export/*.ipa \
+    #       --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
+    #       --apiIssuer "$APP_STORE_CONNECT_API_ISSUER_ID" \
+    #       --api-key-path $RUNNER_TEMP/api_key.p8
