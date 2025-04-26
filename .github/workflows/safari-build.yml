@@ -2,7 +2,7 @@ name: Build and Deploy Safari Extension
 
 on:
   push:
-    branches: [ main ]
+    branches: [ test ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
