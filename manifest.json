@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "Web Extensions",
+    "name": "Hello Extensions",
     "version": "4.9.106",
     "author": "Alexander Shutau",
     "description": "__MSG_extension_description__",
